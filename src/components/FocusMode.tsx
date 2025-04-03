@@ -25,9 +25,17 @@ export function FocusMode() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }, []);
 
+  const handleDurationChange = useCallback((value: string) => {
+    const minutes = parseInt(value, 10);
+    if (!isNaN(minutes) && minutes > 0) {
+      todoActions.setTimerDuration(minutes);
+    }
+  }, []);
+
   if (!currentTodo || !focusMode) return null;
 
   const totalFocusTime = currentTodo.focusHistory?.reduce((acc, session) => acc + session.duration, 0) || 0;
+  const currentDurationMinutes = String(timer.duration / 60);
 
   return (
     <div className="animate-in slide-in-from-bottom duration-500 ease-out">
@@ -42,18 +50,13 @@ export function FocusMode() {
         <div className="space-y-4">
           <div className="flex justify-center items-center gap-4">
             <Select
-              value={String(timer.duration / 60)}
-              onValueChange={(value) => {
-                const minutes = parseInt(value, 10);
-                if (!isNaN(minutes)) {
-                  todoActions.setTimerDuration(minutes);
-                }
-              }}
+              defaultValue={currentDurationMinutes}
+              onValueChange={handleDurationChange}
               disabled={timer.isRunning}
             >
               <SelectTrigger className="w-[180px]">
                 <Timer className="w-4 h-4 mr-2" />
-                <SelectValue />
+                <SelectValue placeholder="Select duration" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="25">25 minutes</SelectItem>
