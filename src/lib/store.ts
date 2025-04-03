@@ -12,17 +12,19 @@ const clearGlobalInterval = () => {
   }
 };
 
+const DEFAULT_TIMER = {
+  isRunning: false,
+  timeLeft: 25 * 60,
+  duration: 25 * 60,
+};
+
 export const useTodoStore = create<TodoStore>()(
   persist(
     (set, get) => ({
       todos: [],
       focusMode: false,
       currentTodo: null,
-      timer: {
-        isRunning: false,
-        timeLeft: 25 * 60,
-        duration: 25 * 60,
-      },
+      timer: DEFAULT_TIMER,
     }),
     {
       name: 'todo-storage',
@@ -53,42 +55,35 @@ export const todoActions = {
       t.id === id ? { ...t, completed: !t.completed } : t
     );
 
-    const updates: Partial<TodoStore> = {
-      todos: newTodos,
-    };
-
-    if (state.currentTodo?.id === id && !todo.completed) {
+    if (state.currentTodo?.id === id) {
       clearGlobalInterval();
-      updates.focusMode = false;
-      updates.currentTodo = null;
-      updates.timer = {
-        isRunning: false,
-        timeLeft: 25 * 60,
-        duration: 25 * 60,
-      };
+      useTodoStore.setState({
+        todos: newTodos,
+        focusMode: false,
+        currentTodo: null,
+        timer: DEFAULT_TIMER,
+      });
+    } else {
+      useTodoStore.setState({ todos: newTodos });
     }
-
-    useTodoStore.setState(updates);
   },
 
   deleteTodo: (id: string) => {
     const state = useTodoStore.getState();
-    const updates: Partial<TodoStore> = {
-      todos: state.todos.filter((todo) => todo.id !== id),
-    };
-
+    
     if (state.currentTodo?.id === id) {
       clearGlobalInterval();
-      updates.focusMode = false;
-      updates.currentTodo = null;
-      updates.timer = {
-        isRunning: false,
-        timeLeft: 25 * 60,
-        duration: 25 * 60,
-      };
+      useTodoStore.setState({
+        todos: state.todos.filter((todo) => todo.id !== id),
+        focusMode: false,
+        currentTodo: null,
+        timer: DEFAULT_TIMER,
+      });
+    } else {
+      useTodoStore.setState({
+        todos: state.todos.filter((todo) => todo.id !== id),
+      });
     }
-
-    useTodoStore.setState(updates);
   },
 
   toggleFocusMode: (todoId?: string) => {
@@ -105,21 +100,13 @@ export const todoActions = {
       useTodoStore.setState({
         focusMode: true,
         currentTodo: targetTodo,
-        timer: {
-          isRunning: false,
-          timeLeft: 25 * 60,
-          duration: 25 * 60,
-        },
+        timer: DEFAULT_TIMER,
       });
     } else {
       useTodoStore.setState({
         focusMode: false,
         currentTodo: null,
-        timer: {
-          isRunning: false,
-          timeLeft: 25 * 60,
-          duration: 25 * 60,
-        },
+        timer: DEFAULT_TIMER,
       });
     }
   },
@@ -130,9 +117,16 @@ export const todoActions = {
     
     clearGlobalInterval();
     
+    useTodoStore.setState({
+      timer: {
+        ...state.timer,
+        isRunning: true,
+      },
+    });
+
     globalInterval = window.setInterval(() => {
       const currentState = useTodoStore.getState();
-      if (!currentState.timer.isRunning || currentState.timer.timeLeft <= 0) {
+      if (!currentState.timer.isRunning) {
         clearGlobalInterval();
         return;
       }
@@ -174,27 +168,16 @@ export const todoActions = {
         });
       }
     }, 1000);
-
-    useTodoStore.setState({
-      timer: {
-        ...state.timer,
-        isRunning: true,
-      },
-    });
   },
 
   pauseTimer: () => {
-    const state = useTodoStore.getState();
-    if (!state.timer.isRunning) return;
-    
     clearGlobalInterval();
-    
-    useTodoStore.setState({
+    useTodoStore.setState((state) => ({
       timer: {
         ...state.timer,
         isRunning: false,
       },
-    });
+    }));
   },
 
   resetTimer: () => {
@@ -202,7 +185,6 @@ export const todoActions = {
     if (state.timer.timeLeft === state.timer.duration) return;
     
     clearGlobalInterval();
-    
     useTodoStore.setState({
       timer: {
         ...state.timer,
@@ -213,17 +195,13 @@ export const todoActions = {
   },
 
   setTimerDuration: (minutes: number) => {
-    const state = useTodoStore.getState();
-    if (state.timer.duration === minutes * 60) return; // Prevent unnecessary updates
-    
     clearGlobalInterval();
-    
-    useTodoStore.setState((state) => ({
+    useTodoStore.setState({
       timer: {
         isRunning: false,
         timeLeft: minutes * 60,
         duration: minutes * 60,
       },
-    }));
+    });
   },
 };
