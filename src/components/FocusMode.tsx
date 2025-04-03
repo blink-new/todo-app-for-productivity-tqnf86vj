@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useTodoStore, todoActions } from '@/lib/store';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -14,20 +14,6 @@ export function FocusMode() {
     timer: state.timer,
     focusMode: state.focusMode,
   }));
-
-  useEffect(() => {
-    let interval: number | undefined;
-    
-    if (timer.isRunning && focusMode) {
-      interval = window.setInterval(todoActions.tickTimer, 1000);
-    }
-    
-    return () => {
-      if (interval) {
-        window.clearInterval(interval);
-      }
-    };
-  }, [timer.isRunning, focusMode]);
 
   const progress = useMemo(() => {
     return ((timer.duration - timer.timeLeft) / timer.duration) * 100;
