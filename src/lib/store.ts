@@ -3,6 +3,15 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { TodoStore, Todo } from './types';
 
+let globalInterval: number | null = null;
+
+const clearGlobalInterval = () => {
+  if (globalInterval) {
+    clearInterval(globalInterval);
+    globalInterval = null;
+  }
+};
+
 export const useTodoStore = create<TodoStore>()(
   persist(
     (set, get) => ({
@@ -14,7 +23,6 @@ export const useTodoStore = create<TodoStore>()(
         timeLeft: 25 * 60,
         duration: 25 * 60,
       },
-      timerInterval: null,
     }),
     {
       name: 'todo-storage',
@@ -50,9 +58,7 @@ export const todoActions = {
     };
 
     if (state.currentTodo?.id === id && !todo.completed) {
-      if (state.timerInterval) {
-        clearInterval(state.timerInterval);
-      }
+      clearGlobalInterval();
       updates.focusMode = false;
       updates.currentTodo = null;
       updates.timer = {
@@ -60,7 +66,6 @@ export const todoActions = {
         timeLeft: 25 * 60,
         duration: 25 * 60,
       };
-      updates.timerInterval = null;
     }
 
     useTodoStore.setState(updates);
@@ -73,9 +78,7 @@ export const todoActions = {
     };
 
     if (state.currentTodo?.id === id) {
-      if (state.timerInterval) {
-        clearInterval(state.timerInterval);
-      }
+      clearGlobalInterval();
       updates.focusMode = false;
       updates.currentTodo = null;
       updates.timer = {
@@ -83,7 +86,6 @@ export const todoActions = {
         timeLeft: 25 * 60,
         duration: 25 * 60,
       };
-      updates.timerInterval = null;
     }
 
     useTodoStore.setState(updates);
@@ -91,6 +93,7 @@ export const todoActions = {
 
   toggleFocusMode: (todoId?: string) => {
     const state = useTodoStore.getState();
+    clearGlobalInterval();
     
     if (!state.focusMode) {
       const targetTodo = todoId 
@@ -109,9 +112,6 @@ export const todoActions = {
         },
       });
     } else {
-      if (state.timerInterval) {
-        clearInterval(state.timerInterval);
-      }
       useTodoStore.setState({
         focusMode: false,
         currentTodo: null,
@@ -120,7 +120,6 @@ export const todoActions = {
           timeLeft: 25 * 60,
           duration: 25 * 60,
         },
-        timerInterval: null,
       });
     }
   },
@@ -129,25 +128,18 @@ export const todoActions = {
     const state = useTodoStore.getState();
     if (!state.currentTodo || state.timer.isRunning || state.timer.timeLeft === 0) return;
     
-    const interval = setInterval(() => {
+    clearGlobalInterval();
+    
+    globalInterval = window.setInterval(() => {
       const currentState = useTodoStore.getState();
       if (!currentState.timer.isRunning || currentState.timer.timeLeft <= 0) {
-        if (currentState.timerInterval) {
-          clearInterval(currentState.timerInterval);
-        }
-        useTodoStore.setState({ timerInterval: null });
+        clearGlobalInterval();
         return;
       }
 
       const newTimeLeft = currentState.timer.timeLeft - 1;
-      const updates: Partial<TodoStore> = {
-        timer: {
-          ...currentState.timer,
-          timeLeft: newTimeLeft,
-        },
-      };
-
-      if (newTimeLeft === 0 && currentState.currentTodo) {
+      
+      if (newTimeLeft === 0) {
         const updatedTodos = currentState.todos.map(todo => {
           if (todo.id === currentState.currentTodo?.id) {
             return {
@@ -164,17 +156,23 @@ export const todoActions = {
           return todo;
         });
         
-        updates.todos = updatedTodos;
-        updates.timer = {
-          ...currentState.timer,
-          isRunning: false,
-          timeLeft: newTimeLeft,
-        };
-        clearInterval(currentState.timerInterval);
-        updates.timerInterval = null;
+        clearGlobalInterval();
+        useTodoStore.setState({
+          todos: updatedTodos,
+          timer: {
+            ...currentState.timer,
+            isRunning: false,
+            timeLeft: 0,
+          },
+        });
+      } else {
+        useTodoStore.setState({
+          timer: {
+            ...currentState.timer,
+            timeLeft: newTimeLeft,
+          },
+        });
       }
-      
-      useTodoStore.setState(updates);
     }, 1000);
 
     useTodoStore.setState({
@@ -182,7 +180,6 @@ export const todoActions = {
         ...state.timer,
         isRunning: true,
       },
-      timerInterval: interval,
     });
   },
 
@@ -190,16 +187,13 @@ export const todoActions = {
     const state = useTodoStore.getState();
     if (!state.timer.isRunning) return;
     
-    if (state.timerInterval) {
-      clearInterval(state.timerInterval);
-    }
+    clearGlobalInterval();
     
     useTodoStore.setState({
       timer: {
         ...state.timer,
         isRunning: false,
       },
-      timerInterval: null,
     });
   },
 
@@ -207,9 +201,7 @@ export const todoActions = {
     const state = useTodoStore.getState();
     if (state.timer.timeLeft === state.timer.duration) return;
     
-    if (state.timerInterval) {
-      clearInterval(state.timerInterval);
-    }
+    clearGlobalInterval();
     
     useTodoStore.setState({
       timer: {
@@ -217,15 +209,11 @@ export const todoActions = {
         isRunning: false,
         timeLeft: state.timer.duration,
       },
-      timerInterval: null,
     });
   },
 
   setTimerDuration: (minutes: number) => {
-    const state = useTodoStore.getState();
-    if (state.timerInterval) {
-      clearInterval(state.timerInterval);
-    }
+    clearGlobalInterval();
     
     useTodoStore.setState({
       timer: {
@@ -233,7 +221,6 @@ export const todoActions = {
         timeLeft: minutes * 60,
         duration: minutes * 60,
       },
-      timerInterval: null,
     });
   },
 };

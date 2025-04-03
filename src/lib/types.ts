@@ -22,5 +22,4 @@ export interface TodoStore {
     timeLeft: number;
     duration: number;
   };
-  timerInterval: number | null;
 }
