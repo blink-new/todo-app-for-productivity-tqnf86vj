@@ -23,75 +23,85 @@ export const useTodoStore = create<TodoStore>()(
 
 export const todoActions = {
   addTodo: (todo: Omit<Todo, 'id' | 'createdAt'>) => {
+    const newTodo = {
+      ...todo,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      focusHistory: [],
+    };
+    
     useTodoStore.setState((state) => ({
-      todos: [
-        ...state.todos,
-        {
-          ...todo,
-          id: crypto.randomUUID(),
-          createdAt: new Date().toISOString(),
-          focusHistory: [],
-        },
-      ],
+      todos: [...state.todos, newTodo],
     }));
   },
   
   toggleTodo: (id: string) => {
-    useTodoStore.setState((state) => {
-      const newTodos = state.todos.map((todo) =>
-        todo.id === id ? { ...todo, completed: !todo.completed } : todo
-      );
-      
-      // If the toggled todo is the current focus todo and it's being completed,
-      // exit focus mode
-      const shouldExitFocus = state.currentTodo?.id === id && 
-        newTodos.find(t => t.id === id)?.completed;
-      
-      return {
-        todos: newTodos,
-        ...(shouldExitFocus ? {
-          focusMode: false,
-          currentTodo: null,
-        } : {}),
+    const state = useTodoStore.getState();
+    const todo = state.todos.find(t => t.id === id);
+    if (!todo) return;
+
+    const newTodos = state.todos.map((t) =>
+      t.id === id ? { ...t, completed: !t.completed } : t
+    );
+
+    const updates: Partial<TodoStore> = {
+      todos: newTodos,
+    };
+
+    // Only update focus mode if the completed todo is the current focus
+    if (state.currentTodo?.id === id && !todo.completed) {
+      updates.focusMode = false;
+      updates.currentTodo = null;
+      updates.timer = {
+        isRunning: false,
+        timeLeft: 25 * 60,
+        duration: 25 * 60,
       };
-    });
+    }
+
+    useTodoStore.setState(updates);
   },
 
   deleteTodo: (id: string) => {
-    useTodoStore.setState((state) => {
-      const shouldExitFocus = state.currentTodo?.id === id;
-      
-      return {
-        todos: state.todos.filter((todo) => todo.id !== id),
-        ...(shouldExitFocus ? {
-          focusMode: false,
-          currentTodo: null,
-        } : {}),
+    const state = useTodoStore.getState();
+    const updates: Partial<TodoStore> = {
+      todos: state.todos.filter((todo) => todo.id !== id),
+    };
+
+    if (state.currentTodo?.id === id) {
+      updates.focusMode = false;
+      updates.currentTodo = null;
+      updates.timer = {
+        isRunning: false,
+        timeLeft: 25 * 60,
+        duration: 25 * 60,
       };
-    });
+    }
+
+    useTodoStore.setState(updates);
   },
 
   toggleFocusMode: (todoId?: string) => {
-    useTodoStore.setState((state) => {
-      if (!state.focusMode) {
-        const targetTodo = todoId 
-          ? state.todos.find(t => t.id === todoId)
-          : state.todos.find(t => !t.completed);
-        
-        if (!targetTodo) return state;
-        
-        return {
-          focusMode: true,
-          currentTodo: targetTodo,
-          timer: {
-            isRunning: false,
-            timeLeft: 25 * 60,
-            duration: 25 * 60,
-          },
-        };
-      }
+    const state = useTodoStore.getState();
+    
+    if (!state.focusMode) {
+      const targetTodo = todoId 
+        ? state.todos.find(t => t.id === todoId && !t.completed)
+        : state.todos.find(t => !t.completed);
       
-      return {
+      if (!targetTodo) return;
+      
+      useTodoStore.setState({
+        focusMode: true,
+        currentTodo: targetTodo,
+        timer: {
+          isRunning: false,
+          timeLeft: 25 * 60,
+          duration: 25 * 60,
+        },
+      });
+    } else {
+      useTodoStore.setState({
         focusMode: false,
         currentTodo: null,
         timer: {
@@ -99,13 +109,13 @@ export const todoActions = {
           timeLeft: 25 * 60,
           duration: 25 * 60,
         },
-      };
-    });
+      });
+    }
   },
 
   startTimer: () => {
     const state = useTodoStore.getState();
-    if (!state.currentTodo || state.timer.isRunning) return;
+    if (!state.currentTodo || state.timer.isRunning || state.timer.timeLeft === 0) return;
     
     useTodoStore.setState({
       timer: {
@@ -151,44 +161,42 @@ export const todoActions = {
   },
 
   tickTimer: () => {
-    useTodoStore.setState((state) => {
-      if (!state.timer.isRunning || state.timer.timeLeft <= 0) return state;
+    const state = useTodoStore.getState();
+    if (!state.timer.isRunning || state.timer.timeLeft <= 0) return;
+    
+    const newTimeLeft = state.timer.timeLeft - 1;
+    const updates: Partial<TodoStore> = {
+      timer: {
+        ...state.timer,
+        timeLeft: newTimeLeft,
+      },
+    };
+
+    if (newTimeLeft === 0 && state.currentTodo) {
+      const updatedTodos = state.todos.map(todo => {
+        if (todo.id === state.currentTodo?.id) {
+          return {
+            ...todo,
+            focusHistory: [
+              ...(todo.focusHistory || []),
+              {
+                startTime: new Date(Date.now() - state.timer.duration * 1000).toISOString(),
+                duration: state.timer.duration / 60,
+              },
+            ],
+          };
+        }
+        return todo;
+      });
       
-      const newTimeLeft = state.timer.timeLeft - 1;
-      
-      if (newTimeLeft === 0 && state.currentTodo) {
-        const updatedTodos = state.todos.map(todo => {
-          if (todo.id === state.currentTodo?.id) {
-            return {
-              ...todo,
-              focusHistory: [
-                ...(todo.focusHistory || []),
-                {
-                  startTime: new Date(Date.now() - state.timer.duration * 1000).toISOString(),
-                  duration: state.timer.duration / 60,
-                },
-              ],
-            };
-          }
-          return todo;
-        });
-        
-        return {
-          todos: updatedTodos,
-          timer: {
-            ...state.timer,
-            isRunning: false,
-            timeLeft: newTimeLeft,
-          },
-        };
-      }
-      
-      return {
-        timer: {
-          ...state.timer,
-          timeLeft: newTimeLeft,
-        },
+      updates.todos = updatedTodos;
+      updates.timer = {
+        ...state.timer,
+        isRunning: false,
+        timeLeft: newTimeLeft,
       };
-    });
+    }
+    
+    useTodoStore.setState(updates);
   },
 };

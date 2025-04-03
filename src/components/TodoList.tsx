@@ -4,9 +4,11 @@ import { TodoItem } from './TodoItem';
 import { FocusMode } from './FocusMode';
 
 export function TodoList() {
-  const todos = useTodoStore((state) => state.todos);
-  const focusMode = useTodoStore((state) => state.focusMode);
-  const currentTodo = useTodoStore((state) => state.currentTodo);
+  const { todos, focusMode, currentTodo } = useTodoStore((state) => ({
+    todos: state.todos,
+    focusMode: state.focusMode,
+    currentTodo: state.currentTodo,
+  }));
 
   const incompleteTodos = todos.filter((todo) => !todo.completed);
   const completedTodos = todos.filter((todo) => todo.completed);
