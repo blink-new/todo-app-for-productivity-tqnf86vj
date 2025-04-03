@@ -5,13 +5,13 @@ import { TodoStore, Todo } from './types';
 
 export const useTodoStore = create<TodoStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       todos: [],
       focusMode: false,
       currentTodo: null,
       timer: {
         isRunning: false,
-        timeLeft: 25 * 60, // 25 minutes in seconds
+        timeLeft: 25 * 60,
         duration: 25 * 60,
       },
     }),
@@ -37,21 +37,38 @@ export const todoActions = {
   },
   
   toggleTodo: (id: string) => {
-    useTodoStore.setState((state) => ({
-      todos: state.todos.map((todo) =>
+    useTodoStore.setState((state) => {
+      const newTodos = state.todos.map((todo) =>
         todo.id === id ? { ...todo, completed: !todo.completed } : todo
-      ),
-      focusMode: state.focusMode && state.currentTodo?.id === id ? false : state.focusMode,
-      currentTodo: state.focusMode && state.currentTodo?.id === id ? null : state.currentTodo,
-    }));
+      );
+      
+      // If the toggled todo is the current focus todo and it's being completed,
+      // exit focus mode
+      const shouldExitFocus = state.currentTodo?.id === id && 
+        newTodos.find(t => t.id === id)?.completed;
+      
+      return {
+        todos: newTodos,
+        ...(shouldExitFocus ? {
+          focusMode: false,
+          currentTodo: null,
+        } : {}),
+      };
+    });
   },
 
   deleteTodo: (id: string) => {
-    useTodoStore.setState((state) => ({
-      todos: state.todos.filter((todo) => todo.id !== id),
-      focusMode: state.currentTodo?.id === id ? false : state.focusMode,
-      currentTodo: state.currentTodo?.id === id ? null : state.currentTodo,
-    }));
+    useTodoStore.setState((state) => {
+      const shouldExitFocus = state.currentTodo?.id === id;
+      
+      return {
+        todos: state.todos.filter((todo) => todo.id !== id),
+        ...(shouldExitFocus ? {
+          focusMode: false,
+          currentTodo: null,
+        } : {}),
+      };
+    });
   },
 
   toggleFocusMode: (todoId?: string) => {
@@ -61,9 +78,11 @@ export const todoActions = {
           ? state.todos.find(t => t.id === todoId)
           : state.todos.find(t => !t.completed);
         
+        if (!targetTodo) return state;
+        
         return {
           focusMode: true,
-          currentTodo: targetTodo || null,
+          currentTodo: targetTodo,
           timer: {
             isRunning: false,
             timeLeft: 25 * 60,
@@ -71,6 +90,7 @@ export const todoActions = {
           },
         };
       }
+      
       return {
         focusMode: false,
         currentTodo: null,
@@ -84,41 +104,50 @@ export const todoActions = {
   },
 
   startTimer: () => {
-    useTodoStore.setState((state) => ({
+    const state = useTodoStore.getState();
+    if (!state.currentTodo || state.timer.isRunning) return;
+    
+    useTodoStore.setState({
       timer: {
         ...state.timer,
         isRunning: true,
       },
-    }));
+    });
   },
 
   pauseTimer: () => {
-    useTodoStore.setState((state) => ({
+    const state = useTodoStore.getState();
+    if (!state.timer.isRunning) return;
+    
+    useTodoStore.setState({
       timer: {
         ...state.timer,
         isRunning: false,
       },
-    }));
+    });
   },
 
   resetTimer: () => {
-    useTodoStore.setState((state) => ({
+    const state = useTodoStore.getState();
+    if (state.timer.timeLeft === state.timer.duration) return;
+    
+    useTodoStore.setState({
       timer: {
         ...state.timer,
         isRunning: false,
         timeLeft: state.timer.duration,
       },
-    }));
+    });
   },
 
   setTimerDuration: (minutes: number) => {
-    useTodoStore.setState((state) => ({
+    useTodoStore.setState({
       timer: {
         isRunning: false,
         timeLeft: minutes * 60,
         duration: minutes * 60,
       },
-    }));
+    });
   },
 
   tickTimer: () => {
@@ -128,7 +157,6 @@ export const todoActions = {
       const newTimeLeft = state.timer.timeLeft - 1;
       
       if (newTimeLeft === 0 && state.currentTodo) {
-        // Record focus session
         const updatedTodos = state.todos.map(todo => {
           if (todo.id === state.currentTodo?.id) {
             return {
@@ -146,7 +174,6 @@ export const todoActions = {
         });
         
         return {
-          ...state,
           todos: updatedTodos,
           timer: {
             ...state.timer,
@@ -157,7 +184,6 @@ export const todoActions = {
       }
       
       return {
-        ...state,
         timer: {
           ...state.timer,
           timeLeft: newTimeLeft,

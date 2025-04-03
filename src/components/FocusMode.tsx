@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useCallback } from 'react';
 import { useTodoStore, todoActions } from '@/lib/store';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -9,30 +9,37 @@ import { Play, Pause, RotateCcw, CheckCircle2, Timer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function FocusMode() {
-  const { currentTodo, timer } = useTodoStore((state) => ({
+  const { currentTodo, timer, focusMode } = useTodoStore((state) => ({
     currentTodo: state.currentTodo,
     timer: state.timer,
+    focusMode: state.focusMode,
   }));
 
   useEffect(() => {
-    let interval: number;
-    if (timer.isRunning) {
-      interval = setInterval(todoActions.tickTimer, 1000) as unknown as number;
+    let interval: number | undefined;
+    
+    if (timer.isRunning && focusMode) {
+      interval = window.setInterval(todoActions.tickTimer, 1000);
     }
-    return () => clearInterval(interval);
-  }, [timer.isRunning]);
+    
+    return () => {
+      if (interval) {
+        window.clearInterval(interval);
+      }
+    };
+  }, [timer.isRunning, focusMode]);
 
   const progress = useMemo(() => {
     return ((timer.duration - timer.timeLeft) / timer.duration) * 100;
   }, [timer.timeLeft, timer.duration]);
 
-  const formatTime = (seconds: number) => {
+  const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+  }, []);
 
-  if (!currentTodo) return null;
+  if (!currentTodo || !focusMode) return null;
 
   const totalFocusTime = currentTodo.focusHistory?.reduce((acc, session) => acc + session.duration, 0) || 0;
 
@@ -51,6 +58,7 @@ export function FocusMode() {
             <Select
               value={String(timer.duration / 60)}
               onValueChange={(value) => todoActions.setTimerDuration(Number(value))}
+              disabled={timer.isRunning}
             >
               <SelectTrigger className="w-[180px]">
                 <Timer className="w-4 h-4 mr-2" />
@@ -79,6 +87,7 @@ export function FocusMode() {
                 onClick={() => todoActions.startTimer()}
                 className="gap-2"
                 size="lg"
+                disabled={timer.timeLeft === 0}
               >
                 <Play className="w-4 h-4" />
                 Start Focus
@@ -102,6 +111,7 @@ export function FocusMode() {
                 "transition-opacity",
                 timer.timeLeft === timer.duration && "opacity-50"
               )}
+              disabled={timer.timeLeft === timer.duration}
             >
               <RotateCcw className="w-4 h-4" />
             </Button>
