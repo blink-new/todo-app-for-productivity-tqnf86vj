@@ -43,7 +43,12 @@ export function FocusMode() {
           <div className="flex justify-center items-center gap-4">
             <Select
               value={String(timer.duration / 60)}
-              onValueChange={(value) => todoActions.setTimerDuration(Number(value))}
+              onValueChange={(value) => {
+                const minutes = parseInt(value, 10);
+                if (!isNaN(minutes)) {
+                  todoActions.setTimerDuration(minutes);
+                }
+              }}
               disabled={timer.isRunning}
             >
               <SelectTrigger className="w-[180px]">

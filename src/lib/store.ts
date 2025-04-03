@@ -213,14 +213,17 @@ export const todoActions = {
   },
 
   setTimerDuration: (minutes: number) => {
+    const state = useTodoStore.getState();
+    if (state.timer.duration === minutes * 60) return; // Prevent unnecessary updates
+    
     clearGlobalInterval();
     
-    useTodoStore.setState({
+    useTodoStore.setState((state) => ({
       timer: {
         isRunning: false,
         timeLeft: minutes * 60,
         duration: minutes * 60,
       },
-    });
+    }));
   },
 };
