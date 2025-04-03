@@ -1,5 +1,5 @@
 
-import { useMemo, useCallback } from 'react';
+import { useMemo } from 'react';
 import { useTodoStore, todoActions } from '@/lib/store';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -19,23 +19,14 @@ export function FocusMode() {
     return ((timer.duration - timer.timeLeft) / timer.duration) * 100;
   }, [timer.timeLeft, timer.duration]);
 
-  const formatTime = useCallback((seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }, []);
-
-  const handleDurationChange = useCallback((value: string) => {
-    const minutes = parseInt(value, 10);
-    if (!isNaN(minutes) && minutes > 0) {
-      todoActions.setTimerDuration(minutes);
-    }
-  }, []);
-
   if (!currentTodo || !focusMode) return null;
 
   const totalFocusTime = currentTodo.focusHistory?.reduce((acc, session) => acc + session.duration, 0) || 0;
-  const currentDurationMinutes = String(timer.duration / 60);
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   return (
     <div className="animate-in slide-in-from-bottom duration-500 ease-out">
@@ -50,13 +41,18 @@ export function FocusMode() {
         <div className="space-y-4">
           <div className="flex justify-center items-center gap-4">
             <Select
-              defaultValue={currentDurationMinutes}
-              onValueChange={handleDurationChange}
+              value={String(timer.duration / 60)}
+              onValueChange={(value) => {
+                const minutes = parseInt(value, 10);
+                if (!isNaN(minutes) && minutes > 0) {
+                  todoActions.setTimerDuration(minutes);
+                }
+              }}
               disabled={timer.isRunning}
             >
               <SelectTrigger className="w-[180px]">
                 <Timer className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Select duration" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="25">25 minutes</SelectItem>
